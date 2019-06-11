@@ -20,5 +20,5 @@ workload = manifest(filename=manifest_location);
 ## Step 30
 ## Generate the concatenated results
 ##---------------------------------------------------------------------------##
-workload.concatenate();
+workload.run();
 

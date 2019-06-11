@@ -1,15 +1,16 @@
 import os,sys,json;
+import shutil,weakref,subprocess;
 
 ##---------------------------------------------------------------------------##
 class manifest:
 
-   linefeed   = "\n";
-   base       = r"/home/ubuntu/target/";
-   target     = None;
-   constants  = [];
-   includes   = [];
-   components = [];
+   linefeed  = "\n";
+   base      = r"/home/ubuntu/";
    
+   constants = [];
+   tasks     = [];
+   filename  = None;
+
    ##------------------------------------------------------------------------##
    def __init__(self,filename):
       
@@ -19,20 +20,34 @@ class manifest:
       with open(filename) as json_file:  
          data = json.load(json_file);
          
-         if 'target' in data:
-            self.target = self.base + data['target'];
-         
          if 'constants' in data:
+            print("  reading " + str(len(data['constants'])) + " constants.");
+            
             self.constants = data['constants'];
          
-         if 'includes' in data:
-            self.includes = data['includes'];
-         
-         if 'separator' in data:
-            self.separator = data["separator"];
+         if 'tasks' in data:
+            print("  reading " + str(len(data['tasks'])) + " tasks.");
             
-         if 'components' in data:
-            self.components = data['components'];
+            for item in data['tasks']:
+               if item["id"] == "concatenate":
+                  print("    concatenate task.");
+                  
+                  self.tasks.append(concatenate(item,self));
+                  
+               if item["id"] == "naturaldocs":
+                  print("    naturaldocs task.");
+                  
+                  self.tasks.append(naturaldocs(item,self));
+               
+               if item["id"] == "wkhtmltopdf":
+                  print("    wkhtmltopdf task.");
+                  
+                  self.tasks.append(wkhtmltopdf(item,self));
+                  
+               if item["id"] == "artifacts":
+                  print("    artifacts task.");
+                  
+                  self.tasks.append(artifacts(item,self));
                
    ##------------------------------------------------------------------------##
    def sub(self,input):
@@ -50,13 +65,60 @@ class manifest:
       return output;
       
    ##------------------------------------------------------------------------##
+   def jobname(self):
+   
+      if self.constants is not None and len(self.constants) > 0:
+         for item in self.constants:
+            key   = item["key"];
+            value = item["value"];
+            
+            if key == "JOBNAME":
+               return value;
+      
+      return 'job';
+      
+   ##------------------------------------------------------------------------##
+   def run(self):
+   
+      for task in self.tasks:
+         task.run();
+      
+##---------------------------------------------------------------------------##
+class concatenate:
+
+   output     = None;
+   includes   = [];
+   separator  = None;
+   components = [];
+   configurations = [];
+   
+   ##------------------------------------------------------------------------##
+   def __init__(self,data,parent):
+      self.parent = weakref.ref(parent);
+      
+      if 'output' in data:
+         self.output = self.parent().base + data["output"];
+      
+      if 'includes' in data:
+         self.includes = data["includes"];
+      
+      if 'separator' in data:
+         self.separator = data["separator"];
+         
+      if 'components' in data:
+         self.components = data["components"];
+         
+      if 'configurations' in data:
+         self.configurations = data["configurations"];
+      
+   ##------------------------------------------------------------------------##
    def sep(self,filename):
    
       output = self.separator;
       
       output = output.replace('%%FILENAME%%',filename);
       
-      output = self.sub(output);
+      output = self.parent().sub(output);
       
       return output;
       
@@ -74,18 +136,18 @@ class manifest:
             if identifier  == '%%' + key + '%%':
             
                for line in value:            
-                  output = output + self.sub(line) + self.linefeed;
+                  output = output + self.parent().sub(line) + self.parent().linefeed;
                   
                break;
                   
       return output;
             
    ##------------------------------------------------------------------------##
-   def concatenate(self):
+   def run(self):
       
       if self.includes is not None and len(self.includes) > 0:
          
-         with open(self.target,"w") as f: 
+         with open(self.output,"w") as f: 
          
             for item in self.includes:
                
@@ -96,12 +158,115 @@ class manifest:
                   if self.separator is not None:
                      f.write(self.sep(filename=item));
                   
-                  if os.path.exists(self.base + item):
-                     with open(self.base + item) as ifile: 
+                  if os.path.exists(self.parent().base + 'target/' + item):
+                     with open(self.parent().base + 'target/' + item) as ifile: 
                         for line in ifile:
                            f.write(line);
                   
                   else:
-                     raise Exception(self.base + item + ' not found.');
+                     raise Exception(self.parent().base + 'target/' + item + ' not found.');
+   
+##---------------------------------------------------------------------------##
+class naturaldocs:
+
+   input      = None;
+   output_dir = None;
+   
+   ##------------------------------------------------------------------------##
+   def __init__(self,data,parent):
+      self.parent = weakref.ref(parent);
+      
+      if 'input' in data:
+         self.input = data["input"];
          
+      if 'output_dir' in data:
+         self.output_dir = data["output_dir"];
+   
+   ##------------------------------------------------------------------------##
+   def run(self):
+      
+      shutil.copy2(
+          self.parent().base + self.input
+         ,self.parent().base + 'ndocs/input'
+      );
+      
+      z = subprocess.check_output([
+          'naturaldocs'
+         ,'-i'
+         ,self.parent().base + 'ndocs/input'
+         ,'-o'
+         ,'FramedHTML'
+         ,self.parent().base + 'ndocs/output'
+         ,'-p'
+         ,self.parent().base + 'ndocs/project'
+      ]);
+      
+      z = subprocess.check_output([
+          'cp'
+         ,'-r'
+         ,self.parent().base + 'ndocs/output/.'
+         ,self.parent().base + self.output_dir
+      ]);
+      
+      self.parent().filename = self.input.replace('.','-') + '.html';
+      
+##---------------------------------------------------------------------------##
+class wkhtmltopdf:
+
+   input_dir  = None;
+   output     = None;
+   
+   ##------------------------------------------------------------------------##
+   def __init__(self,data,parent):
+      self.parent = weakref.ref(parent);
+      
+      if 'input_dir' in data:
+         self.input_dir = data["input_dir"];
          
+      if 'output' in data:
+         self.output = data["output"];
+         
+   ##------------------------------------------------------------------------##
+   def run(self):
+   
+      try:
+         z = subprocess.check_output([
+             'xvfb-run'
+            ,'-a'
+            ,'-s'
+            ,'"-screen 0 640x480x16"' 
+            ,'wkhtmltopdf'
+            ,'--disable-external-links'
+            ,self.parent().base + self.input_dir + '/files/' + self.parent().filename
+            ,self.parent().base + self.output
+         ]);
+         
+      except subprocess.CalledProcessError as e:
+         None; #print(e.output);
+    
+##---------------------------------------------------------------------------##
+class artifacts:
+
+   targets = [];
+   
+   ##------------------------------------------------------------------------##
+   def __init__(self,data,parent):
+      self.parent = weakref.ref(parent);
+      
+      if 'targets' in data:
+         self.targets = data["targets"];
+         
+         for item in self.targets:
+            print("      target: " + item);
+   
+   ##------------------------------------------------------------------------##
+   def run(self):
+      
+      for item in self.targets:
+         file = self.parent().base + item;
+         
+         if os.path.exists(file):
+            shutil.copy2(file,self.parent().base + 'target');
+         
+         else:
+            print("error unable to copy " + file);
