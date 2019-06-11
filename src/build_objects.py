@@ -23,7 +23,8 @@ class manifest:
          if 'constants' in data:
             print("  reading " + str(len(data['constants'])) + " constants.");
             
-            self.constants = data['constants'];
+            for item in data['constants']:
+               self.constants.append(constant(item,self));
          
          if 'tasks' in data:
             print("  reading " + str(len(data['tasks'])) + " tasks.");
@@ -57,8 +58,8 @@ class manifest:
       if self.constants is not None and len(self.constants) > 0:
          
          for item in self.constants:
-            key   = item["key"];
-            value = item["value"];
+            key   = item.key;
+            value = item.value;
             
             output = output.replace('%' + key + '%',value);
             
@@ -82,14 +83,40 @@ class manifest:
    
       for task in self.tasks:
          task.run();
+         
+##---------------------------------------------------------------------------##
+class constant:
+
+   key   = None;
+   value = None;
+   
+   ##------------------------------------------------------------------------##
+   def __init__(self,data,parent):
+      self.parent = weakref.ref(parent);
+      
+      if 'key' in data:
+         self.key = data["key"];
+         
+      if 'value' in data:
+         self.value = data["value"];
+         
+      if 'cmd' in data:
+         cmd = data["cmd"];
+         
+         self.value = subprocess.check_output(
+             cmd.split()
+            ,cwd=self.parent().base + 'target'
+         ).decode("utf-8").rstrip("\n\r");
+         
+      print("    " + self.key + ": " + self.value);
       
 ##---------------------------------------------------------------------------##
 class concatenate:
 
-   output     = None;
-   includes   = [];
-   separator  = None;
-   components = [];
+   output         = None;
+   includes       = [];
+   separator      = None;
+   components     = [];
    configurations = [];
    
    ##------------------------------------------------------------------------##
@@ -109,7 +136,11 @@ class concatenate:
          self.components = data["components"];
          
       if 'configurations' in data:
-         self.configurations = data["configurations"];
+         print("    unpacking configurations.");
+         
+         for item in data["configurations"]:
+            
+            self.configurations.append(configuration(item,self));
       
    ##------------------------------------------------------------------------##
    def sep(self,filename):
@@ -141,6 +172,16 @@ class concatenate:
                break;
                   
       return output;
+      
+   ##------------------------------------------------------------------------##
+   def fetch_configuration(self,file):
+   
+      for item in self.configurations:
+      
+         if file == item.file:
+            return item;
+            
+      return None;
             
    ##------------------------------------------------------------------------##
    def run(self):
@@ -159,13 +200,57 @@ class concatenate:
                      f.write(self.sep(filename=item));
                   
                   if os.path.exists(self.parent().base + 'target/' + item):
+                     config = self.fetch_configuration(item);
+                     
                      with open(self.parent().base + 'target/' + item) as ifile: 
                         for line in ifile:
-                           f.write(line);
+                           
+                           if config is not None:
+                              f.write(config.replace(line));
+                              
+                           else:
+                              f.write(
+                                 self.parent().sub(line)
+                              );
                   
                   else:
                      raise Exception(self.parent().base + 'target/' + item + ' not found.');
    
+##---------------------------------------------------------------------------##
+class configuration:
+
+   id   = None;
+   file = None;
+   replacements = [];
+   
+   ##------------------------------------------------------------------------##
+   def __init__(self,data,parent):
+      self.parent = weakref.ref(parent);
+      
+      if 'id' in data:
+         self.id = data["id"];
+         
+      if 'file' in data:
+         self.file = data["file"];
+         
+      if 'replacements' in data:
+         self.replacements = data["replacements"];
+         
+   ##------------------------------------------------------------------------##
+   def replace(self,line):
+   
+      output = line;
+      
+      if self.replacements is not None and len(self.replacements) > 0:
+         
+         for item in self.replacements:
+            key   = item["string"];
+            value = self.parent().parent().sub(item["value"]);
+            
+            output = output.replace(key,value);
+            
+      return output;
+
 ##---------------------------------------------------------------------------##
 class naturaldocs:
 
