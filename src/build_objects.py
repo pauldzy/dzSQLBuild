@@ -103,10 +103,14 @@ class constant:
       if 'cmd' in data:
          cmd = data["cmd"];
          
-         self.value = subprocess.check_output(
-             cmd.split()
-            ,cwd=self.parent().base + 'target'
-         ).decode("utf-8").rstrip("\n\r");
+         try:
+            self.value = subprocess.check_output(
+                cmd.split()
+               ,cwd=self.parent().base + 'target'
+            ).decode("utf-8").rstrip("\n\r");
+            
+         except subprocess.CalledProcessError as e:
+            self.value = "";            
          
       print("    " + self.key + ": " + self.value);
       
