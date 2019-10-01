@@ -1,12 +1,22 @@
 version: "3.7"
+x-dzbase   : &dzbase    /home/ubuntu
+x-dzgitbase: &dzgitbase /home/ubuntu/gitbase
+x-dzpysrc  : &dzpysrc   /home/ubuntu/src
 services:
    dzsqlbuild:
       build:
          context: .
          dockerfile: Dockerfile
+         args:
+            DZBASE   : *dzbase
+            DZGITBASE: *dzgitbase
+            DZPYSRC  : *dzpysrc
       hostname: dzsqlbuild
+      environment:
+         DZSUBDIR: ${DZSUBDIR}
       user: ${CURRENT_UID}
       volumes:
          - type:   bind
-           source: ${TARGET}
-           target: /home/ubuntu/target
+           source: ${DZGITLOC}
+           target: *dzgitbase
+

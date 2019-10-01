@@ -5,7 +5,15 @@ from build_objects import manifest;
 ## Step 10
 ## Check for incoming manifest
 ##---------------------------------------------------------------------------##
-manifest_location = r"/home/ubuntu/target/manifest.json";
+base    = os.environ['DZBASE'];
+gitbase = os.environ['DZGITBASE'];
+
+subdir = os.environ['DZSUBDIR'];
+if subdir is None or subdir == "":
+   manifest_location = gitbase + r"/manifest.json";
+else:
+   subdir = r"/" + subdir.strip("/");
+   manifest_location = gitbase + subdir + r"/manifest.json";
 
 if not os.path.exists(manifest_location):
    raise Exception('manifest.json file not found in target location.');
@@ -14,7 +22,7 @@ if not os.path.exists(manifest_location):
 ## Step 20
 ## Load the manifest workload
 ##---------------------------------------------------------------------------##
-workload = manifest(filename=manifest_location);
+workload = manifest(base=base,gitbase=gitbase,subdirectory=subdir);
 
 ##---------------------------------------------------------------------------##
 ## Step 30
