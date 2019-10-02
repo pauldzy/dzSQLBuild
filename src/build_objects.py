@@ -1,5 +1,5 @@
 import os,sys,json;
-import shutil,weakref,subprocess;
+import shutil,weakref,subprocess,urllib.request,uuid,zipfile;
 
 ##---------------------------------------------------------------------------##
 class manifest:
@@ -50,25 +50,33 @@ class manifest:
             print("  reading " + str(len(data['tasks'])) + " tasks.");
             
             for item in data['tasks']:
-               if item["type"] == "concatenate":
+               if item["type"] == "zip_download":
+                  print("    zip download task.");
+                  
+                  self.tasks.append(zip_download(item,self));
+               
+               elif item["type"] == "concatenate":
                   print("    concatenate task.");
                   
                   self.tasks.append(concatenate(item,self));
                   
-               if item["type"] == "naturaldocs":
+               elif item["type"] == "naturaldocs":
                   print("    naturaldocs task.");
                   
                   self.tasks.append(naturaldocs(item,self));
                
-               if item["type"] == "wkhtmltopdf":
+               elif item["type"] == "wkhtmltopdf":
                   print("    wkhtmltopdf task.");
                   
                   self.tasks.append(wkhtmltopdf(item,self));
                   
-               if item["type"] == "artifacts":
+               elif item["type"] == "artifacts":
                   print("    artifacts task.");
                   
                   self.tasks.append(artifacts(item,self));
+                  
+               else:
+                  print("    unknown task type <" + str(item["type"]) + ">.");
 
    ##------------------------------------------------------------------------##
    def get_base(self):
@@ -149,15 +157,14 @@ class constant:
             self.cwd = self.get_fullbase();  
          
       if 'cmd' in data:
-         cmd = data["cmd"];
-         
          cwd = self.cwd;
+         
          if cwd is None:
             cwd = self.parent().gitbase;
          
          try:
             self.value = subprocess.check_output(
-                cmd.split()
+                data["cmd"]
                ,cwd=cwd
             ).decode("utf-8").rstrip("\n\r");
             
@@ -310,6 +317,7 @@ class concatenate:
                   if os.path.exists(truepathfile):
                      config = self.fetch_configuration(item);
                      
+                     #print("   merging " + str(truepathfile));
                      with open(truepathfile) as ifile:
                         for line in ifile:
                            
@@ -588,27 +596,19 @@ class wkhtmltopdf:
 class artifacts:
 
    identifier  = None;
-   input_dirs = [];
-   inputs     = [];
+   targets     = [];
    
    ##------------------------------------------------------------------------##
    def __init__(self,data,parent):
       self.parent = weakref.ref(parent);
       
+      if 'identifier' in data:
+         self.identifier = data["identifier"];
+            
       if 'targets' in data:
       
-         if 'identifier' in data:
-            self.identifier = data["identifier"];
-            
-         inp = data["targets"];
-         
-         for item in inp:
-            if 'input_dir' in item:
-               self.input_dirs.append('/' + item["input_dir"].strip('/'));
-            else:
-               self.input_dirs.append("/scratch");
-               
-            self.inputs.append(item["input"]);
+         for item in data["targets"]:
+            self.targets.append(artifact_target(item,self));
             
             print("      target: " + item["input"]);
             
@@ -631,11 +631,168 @@ class artifacts:
    ##------------------------------------------------------------------------##
    def run(self):
       
-      for i in range(len(self.inputs)):
-         file = self.get_base() + self.input_dirs[i] + '/' + self.inputs[i];
+      for item in self.targets:
+         item.run();
+            
+##---------------------------------------------------------------------------##
+class artifact_target:
+
+   identifier  = None;
+   input_dir   = None;
+   input       = None;
+   output_dir  = None;
+   output      = None;
+   
+    ##------------------------------------------------------------------------##
+   def __init__(self,data,parent):
+      self.parent = weakref.ref(parent);
+      
+      if 'identifier' in data:
+         self.identifier = data["identifier"];
+            
+      if 'input_dir' in data:
+         self.input_dir = self.get_base() + '/' + data["input_dir"].strip('/');
+      else:
+         self.input_dir = self.get_base() + '/scratch'
          
-         if os.path.exists(file):
-            shutil.copy2(file,self.get_manifestbase());
+      if 'input' in data:
+         self.input = data["input"];
          
-         else:
-            print("error unable to copy " + file);
+      if 'output_dir' in data:
+         self.output_dir = self.get_base() + '/' + data["output_dir"].strip('/');
+      else:
+         self.output_dir = self.get_manifestbase();
+         
+      if 'output' in data:
+         self.output = data["output"];
+      else:
+         self.output = self.input;
+            
+   ##------------------------------------------------------------------------##
+   def get_base(self):
+      return self.parent().get_base();
+      
+   ##------------------------------------------------------------------------##
+   def get_gitbase(self):
+      return self.parent().get_gitbase();
+      
+   ##------------------------------------------------------------------------##
+   def get_manifestbase(self):
+      return self.parent().get_manifestbase();
+      
+   ##------------------------------------------------------------------------##
+   def get_fullbase(self):
+      return self.parent().get_fullbase();
+   
+   ##------------------------------------------------------------------------##
+   def run(self):
+      
+      src = self.input_dir + '/' + self.input;
+      trg = self.output_dir + '/' + self.output;
+      
+      if os.path.exists(src):
+         shutil.copy2(src,trg);
+      
+      else:
+         print("error unable to copy " + src);
+   
+##---------------------------------------------------------------------------##
+class zip_download:
+
+   identifier = None;
+   url        = None;
+   extracts   = [];
+   zipfile    = None;
+   
+   ##------------------------------------------------------------------------##
+   def __init__(self,data,parent):
+      self.parent = weakref.ref(parent);
+      
+      if 'identifier' in data:
+         self.identifier = data["identifier"];
+         
+      if 'url' in data:
+         self.url = data["url"];
+      
+      if 'extracts' in data:
+         
+         for item in data["extracts"]:
+            self.extracts.append(zip_download_extract(item,self));
+            
+   ##------------------------------------------------------------------------##
+   def get_base(self):
+      return self.parent().get_base();
+      
+   ##------------------------------------------------------------------------##
+   def get_gitbase(self):
+      return self.parent().get_gitbase();
+      
+   ##------------------------------------------------------------------------##
+   def get_manifestbase(self):
+      return self.parent().get_manifestbase();
+      
+   ##------------------------------------------------------------------------##
+   def get_fullbase(self):
+      return self.parent().get_fullbase();
+      
+   ##------------------------------------------------------------------------##
+   def run(self):
+      self.zipfile = '/tmp/' + str(uuid.uuid4());
+      
+      urllib.request.urlretrieve(self.url,self.zipfile);
+      
+      for item in self.extracts:
+         item.extract();
+   
+##---------------------------------------------------------------------------##
+class zip_download_extract:
+
+   identifier = None;
+   zip_path   = None;
+   output_dir = None;
+   output     = None;
+   
+   ##------------------------------------------------------------------------##
+   def __init__(self,data,parent):
+      self.parent = weakref.ref(parent);
+      
+      if 'identifier' in data:
+         self.identifier = data["identifier"];
+         
+      if 'zip_path' in data:
+         self.zip_path = data["zip_path"];
+      
+      if 'output_dir' in data:
+         self.output_dir = '/' + data["output_dir"].strip('/');
+      else:
+         self.output_dir = '/scratch'
+         
+      if 'output' in data:
+         self.output = data["output"];
+         
+   ##------------------------------------------------------------------------##
+   def get_base(self):
+      return self.parent().get_base();
+      
+   ##------------------------------------------------------------------------##
+   def get_gitbase(self):
+      return self.parent().get_gitbase();
+      
+   ##------------------------------------------------------------------------##
+   def get_manifestbase(self):
+      return self.parent().get_manifestbase();
+      
+   ##------------------------------------------------------------------------##
+   def get_fullbase(self):
+      return self.parent().get_fullbase();
+      
+   ##------------------------------------------------------------------------##
+   def extract(self):
+
+      ef = self.get_base() + self.output_dir + '/' + self.output;
+      
+      with zipfile.ZipFile(self.parent().zipfile) as zf:
+         with open(ef,"wb") as f:
+            f.write(zf.read(self.zip_path)) 
+
+      
