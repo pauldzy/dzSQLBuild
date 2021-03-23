@@ -2,6 +2,9 @@ FROM ubuntu
 
 LABEL maintainer="Paul Dziemiela <Paul.Dziemiela@erg.com>"
 
+ARG wkttopdfdeb=wkhtmltox_0.12.6-1.bionic_amd64.deb
+ARG    wkttopdf=https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
+
 RUN \
   apt-get update                       && \
   apt-get install -y python3              \
@@ -19,9 +22,11 @@ RUN \
                      xfonts-75dpi      && \
   rm -rf /var/lib/apt/lists/*          && \
   cd /usr/local/bin                    && \
-  ln -s /usr/bin/python3 python        && \
-  wget -q https://downloads.wkhtmltopdf.org/0.12/0.12.5/wkhtmltox_0.12.5-1.bionic_amd64.deb && \
-  dpkg -i wkhtmltox_0.12.5-1.bionic_amd64.deb
+  ln -s /usr/bin/python3 python
+
+RUN \
+  wget -q ${wkttopdf}                  && \
+  dpkg -i ${wkttopdfdeb}
   
 COPY ./src /home/ubuntu/src
 

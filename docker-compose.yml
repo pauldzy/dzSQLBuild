@@ -5,7 +5,6 @@ services:
          context: .
          dockerfile: Dockerfile
       hostname: dzsqlbuild
-      user: ${CURRENT_UID}
       volumes:
          - type:   bind
            source: ${TARGET}
