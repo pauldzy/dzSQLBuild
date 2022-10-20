@@ -9,3 +9,6 @@ services:
          - type:   bind
            source: ${TARGET}
            target: /home/ubuntu/target
+         - type:   bind
+           source: ${GITTRG:-${TARGET}}
+           target: /home/ubuntu/gittrg

@@ -32,6 +32,7 @@ COPY ./src /home/ubuntu/src
 
 RUN \
   mkdir -p /home/ubuntu/target         && \
+  mkdir -p /home/ubuntu/gittrg         && \
   mkdir -p /home/ubuntu/ndocs/input    && \
   mkdir -p /home/ubuntu/ndocs/output   && \
   mkdir -p /home/ubuntu/ndocs/project  && \

@@ -1,5 +1,5 @@
 import os,sys,json;
-import shutil,weakref,subprocess;
+import shutil,weakref,subprocess,fnmatch;
 
 ##---------------------------------------------------------------------------##
 class manifest:
@@ -102,11 +102,15 @@ class constant:
          
       if 'cmd' in data:
          cmd = data["cmd"];
+         trg = 'target';
+         
+         if cmd[0:4] == 'git ':
+            trg = 'gittrg';
          
          try:
             self.value = subprocess.check_output(
                 cmd.split()
-               ,cwd=self.parent().base + 'target'
+               ,cwd=self.parent().base + trg
             ).decode("utf-8").rstrip("\n\r");
             
          except subprocess.CalledProcessError as e:
@@ -140,7 +144,7 @@ class concatenate:
          self.components = data["components"];
          
       if 'configurations' in data:
-         print("    unpacking configurations.");
+         print("    unpacking " + str(len(data["configurations"])) + " configurations.");
          
          for item in data["configurations"]:
             
@@ -181,8 +185,7 @@ class concatenate:
    def fetch_configuration(self,file):
    
       for item in self.configurations:
-      
-         if file == item.file:
+         if fnmatch.fnmatch(file,item.file):
             return item;
             
       return None;
@@ -236,7 +239,7 @@ class configuration:
          
       if 'file' in data:
          self.file = data["file"];
-         
+
       if 'replacements' in data:
          self.replacements = data["replacements"];
          
