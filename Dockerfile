@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu:bionic
 
 LABEL maintainer="Paul Dziemiela <Paul.Dziemiela@erg.com>"
 
