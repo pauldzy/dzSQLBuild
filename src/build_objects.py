@@ -210,15 +210,20 @@ class concatenate:
                      config = self.fetch_configuration(item);
                      
                      with open(self.parent().base + 'target/' + item) as ifile: 
-                        for line in ifile:
-                           
-                           if config is not None:
-                              f.write(config.replace(line));
+                        
+                        try:
+                           for line in ifile:
                               
-                           else:
-                              f.write(
-                                 self.parent().sub(line)
-                              );
+                              if config is not None:
+                                 f.write(config.replace(line));
+                                 
+                              else:
+                                 f.write(
+                                    self.parent().sub(line)
+                                 );
+                        except:
+                           print(self.parent().base + 'target/' + item);
+                           raise;                           
                   
                   else:
                      raise Exception(self.parent().base + 'target/' + item + ' not found.');
