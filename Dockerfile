@@ -1,9 +1,9 @@
-FROM ubuntu:bionic
+FROM ubuntu:26.04
 
 LABEL maintainer="Paul Dziemiela <Paul.Dziemiela@erg.com>"
 
-ARG wkttopdfdeb=wkhtmltox_0.12.6-1.bionic_amd64.deb
-ARG    wkttopdf=https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
+ARG wkttopdfdeb=wkhtmltox_0.12.6.1-2.jammy_amd64.deb
+ARG    wkttopdf=https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.jammy_amd64.deb
 
 RUN \
   apt-get update                       && \

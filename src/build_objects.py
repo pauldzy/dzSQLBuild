@@ -17,7 +17,11 @@ class manifest:
       if not os.path.exists(filename):
          raise Exception('manifest.json file not found.');
          
-      with open(filename) as json_file:  
+      with open(
+          filename
+         ,'r'
+         ,encoding = 'utf-8'
+      ) as json_file:  
          data = json.load(json_file);
          
          if 'constants' in data:
@@ -195,7 +199,11 @@ class concatenate:
       
       if self.includes is not None and len(self.includes) > 0:
          
-         with open(self.output,"w") as f: 
+         with open(
+             self.output
+            ,"w"
+            ,encoding = 'utf-8'   
+         ) as f: 
          
             for item in self.includes:
                
@@ -209,7 +217,11 @@ class concatenate:
                   if os.path.exists(self.parent().base + 'target/' + item):
                      config = self.fetch_configuration(item);
                      
-                     with open(self.parent().base + 'target/' + item) as ifile: 
+                     with open(
+                         self.parent().base + 'target/' + item
+                        ,'r'
+                        ,encoding = 'utf-8'                      
+                     ) as ifile: 
                         
                         try:
                            for line in ifile:
